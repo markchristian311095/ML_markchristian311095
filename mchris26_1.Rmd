@@ -1,0 +1,77 @@
+---
+title: "ML1"
+author: "Mark Christian"
+date: "9/13/2020"
+output: html_document
+---
+
+```{r}
+
+
+GOT <- read.csv("character-deaths.csv")
+```
+
+
+
+
+
+Thi is the summary descriptive statistics where I identified the classification: chatagorial variables have character and quantitative have statistical summary of mean, meadian and mode. 
+```{r}
+summary(GOT)
+```
+
+
+
+
+
+
+This Table shows the frequency of what characters of the show belonged to which royal family
+```{r}
+FTable <- table(GOT$Allegiances)
+FTable
+```
+
+
+
+
+
+
+This is a bar graph for all the families and their member count
+```{r}
+barplot(FTable, ylab="No. of members",col = "red", border = "blue", las = 2)
+
+```
+
+
+
+
+
+
+
+This is a quantitative stats. for all the characters and what year did they die in the show
+```{r}
+hist( GOT$Death.Year,,xlab = "Year", ylab="No. of Death",col = "Red", border = "black" )
+```
+
+
+
+
+
+
+
+This is a scatter plot command to show which book of the show did the characters died.
+```{r}
+plot(GOT$Book.of.Death)
+```
+
+
+
+
+Over here, I used the transform variable command and Since Game of Thrones started in year 297 as per the story timeline, the death year is 297 and onwards. I changed it to log10 which gave it the range from 1 to 10. Now the mean is 2.476 means on average, most deaths were in the first 25% of the show timeline. 
+```{r}
+summary(log10(GOT$Death.Year))
+```
+
+
+
+
