@@ -1,0 +1,263 @@
+---
+title: "ML Final"
+author: "Mark Christian"
+date: "12/17/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+#load all the libraries
+```{r}
+library(readr)
+library(factoextra)
+library(corrplot)
+library(ggpubr)
+library(dplyr)
+library(caret)
+library(FNN)
+library(gmodels)
+library(cluster)
+```
+
+```{r}
+#summary(BathSoap)
+#str(BathSoap)
+```
+
+
+
+
+#data prep: Change from character to numeric
+
+```{r}
+BS1 <- data.frame(lapply(BathSoap, function(x) as.numeric(sub("%", "", x))))
+
+```
+#we also need to make them percentage
+```{r}
+BS2 <- BS1[,20:46]/100 #this /100 will make them percentage
+```
+
+#exclude and merge them now,
+```{r}
+BS3 <- BS1[, -c(20:46)]
+BSfinal <- cbind(BS3, BS2)
+str(BSfinal)
+```
+#this is much better. all the the variables are now numeric
+
+
+#adding an extra coloumn to see if the custmoers are loyal or not 50% cut
+#creating a vector for loyalty 
+
+#look at the new column cummary
+```{r}
+BSfinal$Loyalty = 1*(BSfinal$Others.999<0.5)
+table(BSfinal$Loyalty)
+```
+318 are loyal 282 are not loyal
+
+
+
+#Normalization 
+```{r}
+set.seed(123)
+norm <- preProcess(BSfinal[12:47], method = c("scale", "center"))
+norm <- predict(norm, BSfinal[12:47])
+```
+
+#norm for purchasing behavior: created a dataframe for purchase behavior first and then basis of purchase and then do k optimization
+```{r}
+purchase_behavior <- BSfinal[, c(12:22,47)]
+Basis_Purchase <- BSfinal[, c(32:46)]
+
+fviz_nbclust(purchase_behavior, kmeans, method = "wss")
+fviz_nbclust(purchase_behavior, kmeans, method = "silhouette")
+fviz_nbclust(Basis_Purchase, kmeans, method = "wss")
+fviz_nbclust(Basis_Purchase, kmeans, method = "silhouette")
+
+```
+#optimal k would be 2 and 2 respectively 
+
+
+
+#now we will do analysis of k=4 and 2 respectively with elbow and sillhoette 
+```{r}
+kmeansfor1 <- kmeans(purchase_behavior, centers = 2, nstart = 25)
+fviz_cluster(kmeansfor1, data = purchase_behavior) -> PB
+sil <- silhouette(kmeansfor1$cluster, dist(purchase_behavior))
+fviz_silhouette(sil)
+PB
+plot(kmeansfor1$centers)
+table(kmeansfor1$cluster)
+
+kmeansfor2 <- kmeans(Basis_Purchase, centers = 2, nstart = 25)
+fviz_cluster(kmeansfor2, data = purchase_behavior) -> BOP
+sil <- silhouette(kmeansfor2$cluster, dist(Basis_Purchase))
+fviz_silhouette(sil)
+BOP
+plot(kmeansfor2$centers)
+table(kmeansfor2$cluster)
+
+
+```
+#For PB,
+#cluster 1 is 144
+#cluster 2 is 456
+
+
+#For BOP,
+#cluster 1 is 78
+#cluster 2 is 522
+
+
+#now lets combine both: 
+```{r}
+
+both <- BSfinal[, c(12:22,32:47)]
+
+
+fviz_nbclust(both, kmeans, method = "wss")
+fviz_nbclust(both, kmeans, method = "silhouette")
+
+```
+ here the k value will be 2 as well
+ 
+ 
+ 
+#now do the same using both behaviors together
+```{r}
+kmeansforboth <- kmeans(both, centers = 2, nstart = 25)
+fviz_cluster(kmeansforboth, data = both) -> BTH
+sil <- silhouette(kmeansforboth$cluster, dist(both))
+fviz_silhouette(sil)
+BTH
+plot(kmeansforboth$centers)
+table(kmeansforboth$cluster)
+```
+
+#CLuster values:
+#1 is 144
+#2 is 456
+
+
+
+#part 2
+#Select what you think is the best segmentation and comment on the characteristics(demographic, brand loyalty, and basis for purchase) of these clusters. (This informationwould be used to guide the development of advertising and promotional campaigns.)
+
+#I think that basis of purchase is model to select as the best segment 
+
+
+
+```{r}
+BSP2 <- data.frame(BSfinal, cluster = kmeansfor2$cluster)
+
+BSP2[ c(1:14,32:46)]
+
+```
+
+
+#seeing the results
+
+```{r}
+result1 <- table(BSP2$SEC, BSP2$Loyalty)
+barplot(result1, main="social class vs loyalty",
+        xlab="Loyalty", ylab="sex",
+        col=c("black", "darkblue", "blue"),
+        legend = rownames(result1), beside=TRUE, args.legend = list(x=ncol(result1)))
+```
+
+```{r}
+ggplot(BSP2, aes(x=as.factor(cluster), y=Avg..Price, 
+                             fill=as.factor(SEC))) + geom_boxplot() +
+                         facet_wrap(~as.factor(cluster), scale="free_x") +
+                         ggtitle("Avg by social class") +
+                         theme(axis.text=element_text(size=12),
+                         axis.title=element_text(size=12), 
+                         plot.title = element_text(size = 15))
+```
+
+
+
+
+
+#part 3 
+#Develop a model that classifies the data into these segments. Since this informationwould most likely be used in targeting direct-mail promotions, it would be useful toselect a market segment that would be defined as a success in the classification model.
+
+```{r}
+set.seed(123)
+part3 <- select(BSP2, 12:22, 32:48)
+
+#new column for cluster 2
+part3$pass <- ifelse(part3$cluster == 2,1,0)
+
+```
+
+
+parting data set to 75% and 25% for test and validation
+```{r}
+split <- createDataPartition(part3$Avg..Price, p=0.75, list=FALSE)
+
+train <- part3[split, ]
+valid <- part3[-split, ]
+
+#lets normalize the dataset
+normalized <- preProcess(train[, 1:28], method=c("center", "scale"))
+train[, 1:28] <- predict(normalized, train[, 1:28]) 
+valid[, 1:28] <- predict(normalized, valid[, 1:28])
+
+
+```
+
+#create dataframe remove predictors 
+```{r}
+trainp<-train[,1:28, drop = TRUE] 
+validp<-valid[,1:28, drop = TRUE]
+# Let's remove the predicted variable 
+traind <-train[,29, drop = TRUE] 
+validd  <-valid[,29, drop = TRUE]
+```
+
+```{r}
+Search_grid <- expand.grid(k=c(1:10))
+trainpredictl <- trainp
+trainpredictl$pass = traind
+```
+
+
+#testingthe model
+```{r}
+testingmodel<-train(factor(pass)~ . , data = trainpredictl, method="knn",tuneGrid=Search_grid,preProcess='range')
+testingmodel
+```
+
+#usingk =10
+```{r}
+set.seed(123)
+knnmodel <-knn(trainp,validp, cl=trainl, k=10 )
+summary(knnmodel)
+conf <- CrossTable(x=validl,y=knnmodel, prop.chisq = FALSE)
+accuratelevel <- (conf$t[2,2] + conf$t[1,1])/ sum(conf$t)
+speci <- conf$t[1,1]/ (conf$t[1,1] + conf$t[1,2]) 
+
+accuratelevel
+speci
+```
+#18 pass 130fail
+
+
+overall good model to be used
+basis if purchase is the best out of 3 models and it can be used for marketing
+
+
+
+
+
