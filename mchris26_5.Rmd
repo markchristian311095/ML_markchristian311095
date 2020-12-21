@@ -1,0 +1,133 @@
+---
+title: "Assignment 5"
+author: "Mark Christian"
+date: "12/5/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(cluster)
+
+```
+
+
+#read and omit all missing values
+```{r}
+Cereals<-read.csv("Cereals.csv")
+
+Cereals <- na.omit(Cereals)
+```
+
+
+#Normalizing first
+```{r}
+Cereal_norm <- cbind(Cereals[, 1:3], scale(Cereals[, -c(1:3)]))
+```
+
+#now applying hierarchical clustering to the data using Euclidean distance to the normalized measurements.
+```{r}
+distance <- dist(Cereal_norm[, -c(1:3)], method = "euclidean")
+hc <- hclust(distance, method = "complete")
+plot(hc, cex = 0.6, hang = -1)
+```
+
+
+#now Use Agnes to compare the clustering from single linkage, complete linkage, average linkage, and Ward
+
+```{r}
+hc_single <- agnes(Cereal_norm, method = "single")
+hc_complete <- agnes(Cereal_norm, method = "complete")
+hc_average <- agnes(Cereal_norm, method = "average")
+hc_ward <- agnes(Cereal_norm, method = "ward")
+hc_single$ac
+hc_complete$ac
+hc_average$ac
+hc_ward$ac
+```
+#the best one is 0.98 the ward method it was closest to 1.
+
+
+#● How many clusters would you choose?
+
+#I would go with 4 and 6 clusters and compare the results
+
+
+```{r}
+hc_ward4 <- hclust(distance, method = "ward.D")
+plot(hc_ward4, cex = 0.6, hang = -1)
+rect.hclust(hc_ward4, k = 4, border = 1:4)     
+Model_1 <- cutree(hc_ward4, 4)
+data <- cbind(data,Model_1)
+``` 
+
+```{r}
+hc_ward6 <- hclust(distance, method = "ward.D")
+plot(hc_ward6, cex = 0.6, hang = -1)
+rect.hclust(hc_ward6, k = 6, border = 1:6)     
+Model_2 <- cutree(hc_ward6, 6)
+data <- cbind(data,Model_2)
+```
+#k=4 looks better as all the cluster height is close and would be better 
+
+#Cluster partition
+
+```{r}
+set.seed(123)
+A_index <- sample(seq_len(nrow(Cereal_norm)), size = 65)
+A <- Cereal_norm[A_index,]
+B <- Cereal_norm[-A_index,]
+```
+
+#Use the cluster centroids from A to assign each record in partition B (each record is assigned to the cluster with the closest centroid).
+```{r}
+A_dist <- dist(A[, -c(1:3)], method = "euclidean")
+hc_A <- hclust(A_dist, method = "ward.D")
+Model_A <- cutree(hc_A, 4)
+A <- cbind(Model_A, A)
+head(A)
+
+
+library(dplyr)
+C1 <- colMeans(A[A$Model_A == 1,5:ncol(A)])
+C2 <- colMeans(A[A$Model_A == 2,5:ncol(A)])
+C3 <- colMeans(A[A$Model_A == 3,5:ncol(A)])
+C4 <- colMeans(A[A$Model_A == 4,5:ncol(A)])
+
+
+Centroids_A <- rbind(C1, C2, C3, C4)
+dist <- dist(rbind(Centroids_A,B[,4:ncol(B)]))
+dist
+```
+
+
+#Assess how consistent the cluster Assess are compared to theAssess based on all the data.
+```{r}
+Assess<- data.frame(data[-A_index, "Model_1"])
+Assess$Model_A <- 0
+Assess[1,2] <- which.max(c(2.462441,3.146983,3.782227,5.983747,4.881300,3.826735))
+Assess[2,2] <- which.max(c(2.312626,3.855177, 4.581339, 8.455727 ,4.827885 ,5.441721))
+Assess[3,2] <- which.max(c(3.437484, 1.869957, 4.404072, 8.395433, 4.851045, 4.429787))
+Assess[4,2] <- which.max(c(3.339714, 1.285089 ,4.752289, 8.059830, 4.687570, 3.657016))
+
+Assess
+```
+
+
+#the Data should not be normalized. Cluster analysis is good and can give you perfect information needed for the nutrients in the cereal kids would be eating. 
+
+
+
+
+
+
+
+
+
+
+
